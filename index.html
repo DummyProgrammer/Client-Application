@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
-    />
+    >
 
     <title>Genesys OAuth Test Widget</title>
 
@@ -29,10 +30,19 @@
         button {
             padding: 8px 16px;
             cursor: pointer;
+            margin-right: 8px;
         }
 
-        #status {
-            margin-top: 16px;
+        .section {
+            margin-top: 20px;
+        }
+
+        #status,
+        #presence {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 4px;
             white-space: pre-wrap;
             word-break: break-word;
         }
@@ -53,42 +63,63 @@
 
     <h3>Genesys OAuth Test</h3>
 
-    <button id="loginButton">
-        Authenticate to Genesys
-    </button>
+    <!-- Authentication -->
+    <div class="section">
 
-    <div id="status">
-        Not authenticated
+        <button id="loginButton">
+            Authenticate to Genesys
+        </button>
+
+        <div id="status">
+            Not authenticated
+        </div>
+
+    </div>
+
+
+    <!-- Presence -->
+    <div class="section">
+
+        <h4>Current User Presence</h4>
+
+        <button id="presenceButton" disabled>
+            Get Presence
+        </button>
+
+        <div id="presence">
+            Authenticate first.
+        </div>
+
     </div>
 
 </div>
 
+
 <script>
 
-    // ------------------------------------------------------------
+    // ============================================================
     // Configuration
-    // ------------------------------------------------------------
+    // ============================================================
 
-    const clientId = 'YOUR_OAUTH_CLIENT_ID';
+    const clientId = '9d9b5378-2f8f-4196-b1fb-43634adb2736';
 
-    // Example:
-    // const redirectUri = 'https://yourserver.example.com/index.html';
+    const redirectUri =
+        window.location.origin +
+        window.location.pathname;
 
-    const redirectUri = window.location.origin + window.location.pathname;
 
-
-    // ------------------------------------------------------------
+    // ============================================================
     // Genesys Platform Client
-    // ------------------------------------------------------------
+    // ============================================================
 
     const platformClient = require('platformClient');
 
     const client = platformClient.ApiClient.instance;
 
 
-    // ------------------------------------------------------------
-    // Set Genesys Cloud region
-    // ------------------------------------------------------------
+    // ============================================================
+    // Genesys Cloud Region
+    // ============================================================
 
     // US West 2
     client.setEnvironment(
@@ -96,50 +127,96 @@
     );
 
 
-    // ------------------------------------------------------------
-    // UI helpers
-    // ------------------------------------------------------------
+    // ============================================================
+    // API instances
+    // ============================================================
 
-    const status = document.getElementById('status');
+    const usersApi = new platformClient.UsersApi();
 
-    function setStatus(message, type) {
 
-        status.textContent = message;
+    // ============================================================
+    // UI elements
+    // ============================================================
 
-        status.className = type || '';
+    const loginButton =
+        document.getElementById('loginButton');
+
+    const presenceButton =
+        document.getElementById('presenceButton');
+
+    const status =
+        document.getElementById('status');
+
+    const presence =
+        document.getElementById('presence');
+
+
+    // ============================================================
+    // Helper
+    // ============================================================
+
+    function setStatus(element, message, type) {
+
+        element.textContent = message;
+
+        element.className = type || '';
+
     }
 
 
-    // ------------------------------------------------------------
+    // ============================================================
     // Authenticate
-    // ------------------------------------------------------------
+    // ============================================================
 
     async function authenticate() {
 
-        setStatus('Opening Genesys authentication...');
+        setStatus(
+            status,
+            'Opening Genesys authentication...'
+        );
 
         try {
 
-            const data = await client.loginImplicitGrant(
-                clientId,
-                redirectUri,
-                {
-                    state: 'widget-auth-test'
-                }
+            const data =
+                await client.loginImplicitGrant(
+                    clientId,
+                    redirectUri,
+                    {
+                        state: 'widget-auth-test',
+
+                        authPopupConfiguration: {
+                            usePopup: false
+                        }
+                    }
+                );
+
+
+            console.log(
+                'Implicit grant response:',
+                data
             );
 
-            console.log('Implicit grant response:', data);
-
-            setStatus(
-                'Authenticated successfully!\n\n' +
-                JSON.stringify(data, null, 2),
-                'success'
-            );
 
             console.log(
                 'Access token:',
-                client.authToken
+                client.authData.accessToken
             );
+
+
+            setStatus(
+                status,
+                'Authenticated successfully!',
+                'success'
+            );
+
+
+            // Enable presence button
+            presenceButton.disabled = false;
+
+
+            // Automatically retrieve presence
+            await getPresence();
+
 
         } catch (error) {
 
@@ -148,22 +225,158 @@
                 error
             );
 
+
             setStatus(
+                status,
                 'Authentication failed:\n\n' +
-                JSON.stringify(error, null, 2),
+                formatError(error),
                 'error'
             );
+
         }
+
     }
 
 
-    // ------------------------------------------------------------
-    // Button
-    // ------------------------------------------------------------
+    // ============================================================
+    // Get Current User Presence
+    // ============================================================
 
-    document
-        .getElementById('loginButton')
-        .addEventListener('click', authenticate);
+    async function getPresence() {
+
+        setStatus(
+            presence,
+            'Getting current user presence...'
+        );
+
+        try {
+
+            /*
+             * This uses the access token/session that was
+             * established by loginImplicitGrant().
+             *
+             * GET /api/v2/users/me?expand=presence
+             */
+
+            const userMe =
+                await usersApi.getUsersMe({
+                    expand: ['presence']
+                });
+
+
+            console.log(
+                'Users/me response:',
+                userMe
+            );
+
+
+            // ----------------------------------------------------
+            // Display useful presence information
+            // ----------------------------------------------------
+
+            const presenceObject =
+                userMe.presence;
+
+
+            if (presenceObject) {
+
+                setStatus(
+                    presence,
+                    JSON.stringify(
+                        {
+                            userId: userMe.id,
+                            userName: userMe.name,
+                            presence: presenceObject
+                        },
+                        null,
+                        2
+                    ),
+                    'success'
+                );
+
+            } else {
+
+                setStatus(
+                    presence,
+                    'API call succeeded, but no presence object was returned.\n\n' +
+                    JSON.stringify(
+                        userMe,
+                        null,
+                        2
+                    )
+                );
+
+            }
+
+
+        } catch (error) {
+
+            console.error(
+                'Presence API failed:',
+                error
+            );
+
+
+            setStatus(
+                presence,
+                'Presence API request failed:\n\n' +
+                formatError(error),
+                'error'
+            );
+
+        }
+
+    }
+
+
+    // ============================================================
+    // Error formatting
+    // ============================================================
+
+    function formatError(error) {
+
+        if (!error) {
+            return 'Unknown error';
+        }
+
+
+        /*
+         * The SDK error can contain useful fields such as:
+         *
+         * status
+         * message
+         * body
+         * response
+         */
+
+        if (typeof error === 'string') {
+            return error;
+        }
+
+
+        return JSON.stringify(
+            error,
+            Object.getOwnPropertyNames(error),
+            2
+        );
+
+    }
+
+
+    // ============================================================
+    // Event handlers
+    // ============================================================
+
+    loginButton.addEventListener(
+        'click',
+        authenticate
+    );
+
+
+    presenceButton.addEventListener(
+        'click',
+        getPresence
+    );
 
 </script>
 
