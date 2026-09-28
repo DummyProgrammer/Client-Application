@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    />
+
+    <title>Genesys OAuth Test Widget</title>
+
+    <!-- Genesys Cloud Platform Client SDK -->
+    <script src="https://sdk-cdn.mypurecloud.com/javascript/latest/purecloud-platform-client-v2.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 16px;
+            background: #f5f5f5;
+        }
+
+        .container {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+        }
+
+        button {
+            padding: 8px 16px;
+            cursor: pointer;
+        }
+
+        #status {
+            margin-top: 16px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .success {
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h3>Genesys OAuth Test</h3>
+
+    <button id="loginButton">
+        Authenticate to Genesys
+    </button>
+
+    <div id="status">
+        Not authenticated
+    </div>
+
+</div>
+
+<script>
+
+    // ------------------------------------------------------------
+    // Configuration
+    // ------------------------------------------------------------
+
+    const clientId = 'YOUR_OAUTH_CLIENT_ID';
+
+    // Example:
+    // const redirectUri = 'https://yourserver.example.com/index.html';
+
+    const redirectUri = window.location.origin + window.location.pathname;
+
+
+    // ------------------------------------------------------------
+    // Genesys Platform Client
+    // ------------------------------------------------------------
+
+    const platformClient = require('platformClient');
+
+    const client = platformClient.ApiClient.instance;
+
+
+    // ------------------------------------------------------------
+    // Set Genesys Cloud region
+    // ------------------------------------------------------------
+
+    // US West 2
+    client.setEnvironment(
+        platformClient.PureCloudRegionHosts.us_west_2
+    );
+
+
+    // ------------------------------------------------------------
+    // UI helpers
+    // ------------------------------------------------------------
+
+    const status = document.getElementById('status');
+
+    function setStatus(message, type) {
+
+        status.textContent = message;
+
+        status.className = type || '';
+    }
+
+
+    // ------------------------------------------------------------
+    // Authenticate
+    // ------------------------------------------------------------
+
+    async function authenticate() {
+
+        setStatus('Opening Genesys authentication...');
+
+        try {
+
+            const data = await client.loginImplicitGrant(
+                clientId,
+                redirectUri,
+                {
+                    state: 'widget-auth-test'
+                }
+            );
+
+            console.log('Implicit grant response:', data);
+
+            setStatus(
+                'Authenticated successfully!\n\n' +
+                JSON.stringify(data, null, 2),
+                'success'
+            );
+
+            console.log(
+                'Access token:',
+                client.authToken
+            );
+
+        } catch (error) {
+
+            console.error(
+                'Genesys authentication failed:',
+                error
+            );
+
+            setStatus(
+                'Authentication failed:\n\n' +
+                JSON.stringify(error, null, 2),
+                'error'
+            );
+        }
+    }
+
+
+    // ------------------------------------------------------------
+    // Button
+    // ------------------------------------------------------------
+
+    document
+        .getElementById('loginButton')
+        .addEventListener('click', authenticate);
+
+</script>
+
+</body>
+</html>
