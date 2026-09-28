@@ -126,6 +126,8 @@
         platformClient.PureCloudRegionHosts.us_west_2
     );
 
+    //Persist Session
+    client.setPersistSettings(true);
 
     // ============================================================
     // API instances
@@ -187,7 +189,7 @@
                         org: "",
 
                         authPopupConfiguration: {
-                            usePopup: false
+                            usePopup: true
                         }
                     }
                 );
